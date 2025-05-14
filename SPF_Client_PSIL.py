@@ -14,12 +14,13 @@ import matplotlib.pyplot as plt
 import pyodbc
 import random
 
-#SPF function        
+
+#SPF function
 def SPF(B1,B2,B3,b):
     terms = []
     EVs = []
     for i in range(len(Data)):    
-        #Expected Value calculation              
+        #Expected Value calculation
         E = Data['L'][i]*(B1*(Data['AADT'][i]**B2)/((Data['AADT'][i]**B2)+(B3**B2)))
         EVs.append(E) #adds EV to list
         #Log Likelihood calculation. 
