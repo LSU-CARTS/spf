@@ -24,7 +24,7 @@ def SPF(B1,B2,B3,b):
         E = Data['L'][i]*(B1*(Data['AADT'][i]**B2)/((Data['AADT'][i]**B2)+(B3**B2)))
         EVs.append(E) #adds EV to list
         #Log Likelihood calculation. 
-        term = scipy.special.gammaln(b*Data['L'][i]+Data[AccType][i])-scipy.special.gammaln(b*Data['L'][i])+b*Data['L'][i]*np.log(b*Data['L'][i])+Data[AccType][i]*np.log(E)-(b*Data['L'][i]+Data[AccType][i])*np.log(b*Data['L'][i]+E)
+        term = scipy.special.gammaln(b * Data['L'][i] + Data[CrashCategory][i]) - scipy.special.gammaln(b * Data['L'][i]) + b * Data['L'][i] * np.log(b * Data['L'][i]) + Data[CrashCategory][i] * np.log(E) - (b * Data['L'][i] + Data[CrashCategory][i]) * np.log(b * Data['L'][i] + E)
         terms.append(term) #adds log likelihood to list
     return({'Expected Values' : EVs, 'Log Likelihoods' : terms})
     
@@ -51,10 +51,10 @@ def Multistart(starts=3,basestart=[1000,1,10**7,1]):
             #optimizes SumLogLik from a randomized fraction of the basestart
             #sets a constraint that SumEVs is equal to the sum of the accident counts column
             #sets upper and lower bounds for the parameters
-            xSoln = em.maximize(criterion=SumLogLik, params=basestart*np.random.rand(4,), algorithm='scipy_slsqp', 
-                               constraints={"type": "nonlinear", "func": SumEVs, "value": np.sum(Data[AccType])},
-                               lower_bounds=np.array([0.001,0.001,0.001,0.001]),
-                               upper_bounds=np.array([10**10,100,10**12,100]))
+            xSoln = em.maximize(criterion=SumLogLik, params=basestart*np.random.rand(4,), algorithm='scipy_slsqp',
+                                constraints={"type": "nonlinear", "func": SumEVs, "value": np.sum(Data[CrashCategory])},
+                                lower_bounds=np.array([0.001,0.001,0.001,0.001]),
+                                upper_bounds=np.array([10**10,100,10**12,100]))
             #Uses the solution parameters to calculate sum log likelihood
             xLL = SumLogLik(xSoln.params)
             #Checks sum log likelihood against previous best solution
@@ -113,7 +113,7 @@ while x<1:
     
     #Assigns user inputs to appropriate variables for code.
     HwyClass = values[0]
-    AccType = values[1]
+    CrashCategory = values[1]
     MinAADT = int(values[2])
     MaxAADT = int(values[3])
     MinL = float(values[4])
@@ -174,27 +174,30 @@ while x<1:
         RandSamp.sort()
         L_list = []
         AADT_list = []
-        Acc_list = []
-        for Index in RandSamp:
-            L_list.append(DB_filtered['SegmentLength'][Index])
-            AADT_list.append(DB_filtered['AvgAADT'][Index])
-            if AccType == 'TotalInjury':
-                Acc_list.append(DB_filtered['TotalCrashes'][Index] - DB_filtered['PDO'][Index])
+        crash_list = []
+        for Index in RandSamp:  # iterates over the random sample
+            L_list.append(DB_filtered['SegmentLength'][Index])  # creates a list of the segment lengths (could just get the column and do Series.to_list())
+            AADT_list.append(DB_filtered['AvgAADT'][Index])  # creates a list of the AADTs (could just get the column and do Series.to_list())
+            # Gets num of crashes
+            if CrashCategory == 'TotalInjury':
+                crash_list.append(DB_filtered['TotalCrashes'][Index] - DB_filtered['PDO'][Index])  # if crash cat is TotalInj then subtract PDO from Total Crashes
             else:
-                Acc_list.append(DB_filtered[AccType][Index])
+                crash_list.append(DB_filtered[CrashCategory][Index])                               # otherwise, there's a column specifically named after the other options
+                # This could change since the new PSI list has a total injury column
+                # we could also fit SPFs for any column in Network Screening hypothetically
         for n in range(5):
-            L_list.append(DB_filtered['SegmentLength'][len(DB_filtered['AvgAADT'])-5+n])
-            AADT_list.append(DB_filtered['AvgAADT'][len(DB_filtered['AvgAADT'])-5+n])
-            if AccType == 'TotalInjury':
-                Acc_list.append(DB_filtered['TotalCrashes'][len(DB_filtered['AvgAADT'])-5+n] - DB_filtered['PDO'][len(DB_filtered['AvgAADT'])-5+n])
+            L_list.append(DB_filtered['SegmentLength'][len(DB_filtered['AvgAADT'])-5+n])  # adds the 5 longest segments to the sample
+            AADT_list.append(DB_filtered['AvgAADT'][len(DB_filtered['AvgAADT'])-5+n])   # adds the 5 highest aadt segments to the sample
+            if CrashCategory == 'TotalInjury':
+                crash_list.append(DB_filtered['TotalCrashes'][len(DB_filtered['AvgAADT']) - 5 + n] - DB_filtered['PDO'][len(DB_filtered['AvgAADT']) - 5 + n])  # add the top 5 segments by injury crashes
             else:
-                Acc_list.append(DB_filtered[AccType][len(DB_filtered['AvgAADT'])-5+n])
-        Data = pd.DataFrame({'L' : L_list, 'AADT' : AADT_list, AccType : Acc_list})
+                crash_list.append(DB_filtered[CrashCategory][len(DB_filtered['AvgAADT']) - 5 + n])  # add the top 5 segments by selected crash category
+        Data = pd.DataFrame({'L' : L_list, 'AADT' : AADT_list, CrashCategory : crash_list})  # combine the selected data into a df
     else:
-        if AccType == 'TotalInjury':
-            Data = pd.DataFrame({'L' : DB_filtered['SegmentLength'], 'AADT' : DB_filtered['AvgAADT'], AccType : DB_filtered['TotalCrashes'] - DB_filtered['PDO']})
+        if CrashCategory == 'TotalInjury':
+            Data = pd.DataFrame({'L' : DB_filtered['SegmentLength'], 'AADT' : DB_filtered['AvgAADT'], CrashCategory : DB_filtered['TotalCrashes'] - DB_filtered['PDO']})
         else:
-            Data = pd.DataFrame({'L' : DB_filtered['SegmentLength'], 'AADT' : DB_filtered['AvgAADT'], AccType : DB_filtered[AccType]})
+            Data = pd.DataFrame({'L' : DB_filtered['SegmentLength'], 'AADT' : DB_filtered['AvgAADT'], CrashCategory : DB_filtered[CrashCategory]})
 
     y = 0.2 #y value. Represents a 5 year sample size.
     params = Multistart().params #Runs optimizer function and gets parameters
@@ -202,9 +205,9 @@ while x<1:
     #Filling out the table based on the optimized parameters
     Data['N_fit'] = SPF(params[0],params[1],params[2],params[3])['Expected Values']
     Data['Log Likelihood'] = SPF(params[0],params[1],params[2],params[3])['Log Likelihoods']
-    Data['N_TL/mi/y'] = y*Data[AccType]/Data['L']
+    Data['N_TL/mi/y'] = y * Data[CrashCategory] / Data['L']
     Data['N_p/mi/y'] = y*Data['N_fit']/Data['L']
-    Data['Residual'] = Data[AccType]-Data['N_fit']
+    Data['Residual'] = Data[CrashCategory] - Data['N_fit']
     Data['Sqr Res'] = Data['Residual']**2
 
     CumRes = []
@@ -228,7 +231,7 @@ while x<1:
         sigmas.append(sigma)
         W_f = 1/(1+(Data['N_fit'][i]/(params[3]*Data['L'][i])))
         W_fs.append(W_f)
-        EB_freq = W_f*Data['N_fit'][i]+(1-W_f)*Data[AccType][i]
+        EB_freq = W_f*Data['N_fit'][i]+(1-W_f)*Data[CrashCategory][i]
         EB_freqs.append(EB_freq)
         N_EB = y*EB_freq/Data['L'][i]
         N_EBs.append(N_EB)
