@@ -193,7 +193,7 @@ while x<1:
             else:
                 crash_list.append(DB_filtered[CrashCategory][len(DB_filtered['AvgAADT']) - 5 + n])  # add the top 5 segments by selected crash category
         Data = pd.DataFrame({'L' : L_list, 'AADT' : AADT_list, CrashCategory : crash_list})  # combine the selected data into a df
-    else:
+    else:  # for if you input a sample size larger than available data
         if CrashCategory == 'TotalInjury':
             Data = pd.DataFrame({'L' : DB_filtered['SegmentLength'], 'AADT' : DB_filtered['AvgAADT'], CrashCategory : DB_filtered['TotalCrashes'] - DB_filtered['PDO']})
         else:
